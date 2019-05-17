@@ -4,9 +4,8 @@
     Description: Collection of functions for working with an MS SQL Server database.    
  #>
 
- function Open-SqlConnection
- {
-     <# 
+function Open-SqlConnection {
+    <# 
       .SYNOPSIS
        Open MS SQL Server connection database file.
  
@@ -36,43 +35,30 @@
  
         Open database connection.
      #> 
-     [CmdletBinding()] 
-         param( 
-             [Parameter(Mandatory=$true)] [string] $Server
-                 ,[Parameter(Mandatory=$true)] [string] $Database
-                 ,[Parameter(Mandatory=$false)] [string] $Username = $null
-                 ,[Parameter(Mandatory=$false)] [SecureString] $Password = $null
-                 ,[Parameter(Mandatory=$false)] [int] $Timeout = 15 
-         );
+    [CmdletBinding()] 
+    param( 
+        [Parameter(Mandatory = $true)] [string] $Server,
+        [Parameter(Mandatory = $true)] [string] $Database,
+        [Parameter(Mandatory = $false)] [string] $Username = $null,
+        [Parameter(Mandatory = $false)] [SecureString] $Password = $null,
+        [Parameter(Mandatory = $false)] [int] $Timeout = 15 
+    );
  
-     BEGIN
-     {
-         $connectionString = 'Server={0};Database={1};Connect Timeout={2}' -f $Server, $Database, $Timeout;
-         if ([string]::IsNullOrEmpty($Username) -eq $true ) 
-         { 
-             $connectionString = '{0};Integrated Security=True' -f $connectionString;
-         }
-         else
-         {
-             $connectionString = '{0};User ID={1};Password={2}' -f $connectionString, $Username, $Password;        
-         } 
-     }
-     
-     PROCESS
-     { 
-         $connection = New-Object System.Data.SqlClient.SqlConnection($connectionString);
-         $connection.Open();
-         return $connection;
-     }
+    $security = if ([string]::IsNullOrEmpty($Username) ) { 
+        'Integrated Security=True';
+    }
+    else {
+        'User ID={0};Password={1}' -f $Username, $Password;        
+    } 
+
+    $connectionString = 'Server={0};Database={1};Connect Timeout={2};{3}' -f $Server, $Database, $Timeout, $security;
+    $connection = New-Object System.Data.SqlClient.SqlConnection($connectionString);
+    $connection.Open();
+    return $connection;
+}
  
-     END
-     {}
- 
- }
- 
- function Get-SqlData
- {
-     <# 
+function Get-SqlData {
+    <# 
       .SYNOSPIS 
        Get SQL data from database using inputed query.
  
@@ -103,43 +89,31 @@
  
      #>
  
-     [CmdletBinding()] 
-         param( 
-             [Parameter(Position=0, Mandatory=$true)] [System.Data.SqlClient.SqlConnection] $Connection
-                 ,[Parameter(Position=1, Mandatory=$true)] [string] $Query
-                 ,[Parameter(Position=2, Mandatory=$false)] [System.Object] $Parameters = @{}
-         );
+    [CmdletBinding()] 
+    param( 
+        [Parameter(Mandatory = $true)] [System.Data.SqlClient.SqlConnection] $Connection,
+        [Parameter(Mandatory = $true)] [string] $Query,
+        [Parameter(Mandatory = $false)] [hashtable] $Parameters = @{ }
+    );
      
-     BEGIN
-     {
-         ## Create query:
-         [System.Data.SqlClient.SqlCommand] $command = $Connection.CreateCommand();
-         $command.CommandText = $Query;
-         $command.CommandTimeout = $null;
+    ## Create query:
+    [System.Data.SqlClient.SqlCommand] $command = $Connection.CreateCommand();
+    $command.CommandText = $Query;
+    $command.CommandTimeout = $null;
          
-         ## Load parameters:
-         foreach($key in $Parameters.Keys)
-         {
-             [void] $command.Parameters.AddWithValue("@$key",  $(if ( $null -eq $Parameters[$key] ) { [DBNull]::Value; } else { $Parameters[$key]; }) );
-         }    
-     }
+    ## Load parameters:
+    foreach ($key in $Parameters.Keys) {
+        [void] $command.Parameters.AddWithValue("@$key", $(if ( $null -eq $Parameters[$key] ) { [DBNull]::Value; } else { $Parameters[$key]; }) );
+    }    
+
+    ## Execute query:
+    $dataTable = New-Object System.Data.DataTable;
+    $dataTable.Load( $command.ExecuteReader() );
+    $dataTable;
+}
  
-     PROCESS
-     {
-         ## Execute query:
-         $dataTable = New-Object System.Data.DataTable;
-         $dataTable.Load( $command.ExecuteReader() );
-         $dataTable;
-     }
- 
-     END
-     {}
- }
- 
- function Invoke-SqlQuery
- { 
- 
-     <# 
+function Invoke-SqlQuery {  
+    <# 
       .SYNOSPIS 
        Get SQL data from database using inputed query.
  
@@ -161,38 +135,26 @@
        Execute database query - insert new username.
  
      #>
-     [CmdletBinding()] 
-         param( 
-             [Parameter(Position=0, Mandatory=$true)] [System.Data.SqlClient.SqlConnection] $Connection
-                 ,[Parameter(Position=1, Mandatory=$true)] [string] $Query
-                 ,[Parameter(Position=2, Mandatory=$false)] [System.Object] $Parameters = @{}
-         );
+    [CmdletBinding()] 
+    param( 
+        [Parameter(Mandatory = $true)] [System.Data.SqlClient.SqlConnection] $Connection,
+        [Parameter(Mandatory = $true)] [string] $Query,
+        [Parameter(Mandatory = $false)] [hashtable] $Parameters = @{ }
+    );
      
-     BEGIN
-     {
-         [System.Data.SqlClient.SqlCommand] $command = $Connection.CreateCommand();
-         $command.CommandText = $Query;
-         $command.CommandTimeout = $null;
+    [System.Data.SqlClient.SqlCommand] $command = $Connection.CreateCommand();
+    $command.CommandText = $Query;
+    $command.CommandTimeout = $null;
  
-         ## Load parameters:
-         foreach($key in $Parameters.Keys)
-         {
-             [void] $command.Parameters.AddWithValue("@$key",  $(if ( $null -eq $Parameters[$key] ) { [DBNull]::Value; } else { $Parameters[$key]; }) );
-         }
-     }
+    ## Load parameters:
+    foreach ($key in $Parameters.Keys) {
+        [void] $command.Parameters.AddWithValue("@$key", $(if ( $null -eq $Parameters[$key] ) { [DBNull]::Value; } else { $Parameters[$key]; }) );
+    }
+    $command.ExecuteNonQuery();
+}
  
-     PROCESS
-     {
-         $command.ExecuteNonQuery();
-     }    
- 
-     END
-     {}
- }
- 
- function Sync-SqlData
- {
-     <# 
+function Sync-SqlData {
+    <# 
       .SYNOSPIS 
        Sync SQL data.
  
@@ -214,25 +176,15 @@
        Sync data from Accounts to Accounts_Backup account.
  
      #>
-     [CmdletBinding()] 
-         param( 
-             [Parameter(Position=0, Mandatory=$true)] [System.Data.SqlClient.SqlConnection] $Connection
-                 ,[Parameter(Position=1, Mandatory=$true)] [string] $Table
-                 ,[Parameter(Position=2, Mandatory=$false)] $Data
-         );
+    [CmdletBinding()] 
+    param( 
+        [Parameter(Mandatory = $true)] [System.Data.SqlClient.SqlConnection] $Connection,
+        [Parameter(Mandatory = $true)] [string] $Table,
+        [Parameter(Mandatory = $false)] [System.Data.DataTable] $Data
+    );
      
-     BEGIN
-     {	
-         $bulkCopy = New-Object Data.SqlClient.SqlBulkCopy($Connection);
-         $bulkCopy.DestinationTableName = $TableNTableame;
-     }
- 
-     PROCESS
-     {
-         $bulkCopy.WriteToServer( $Data );
-     }
- 
-     END
-     {}
- }
+    $bulkCopy = New-Object Data.SqlClient.SqlBulkCopy($Connection);
+    $bulkCopy.DestinationTableName = $TableNTableame;
+    $bulkCopy.WriteToServer( $Data );
+}
   
