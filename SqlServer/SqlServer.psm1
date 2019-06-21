@@ -18,11 +18,8 @@ function Open-SqlConnection {
       .PARAMETER Database
       The name of the database to open once connected.
       
-      .PARAMETER Username
-      Username to use in connection. If ommitted the user's executing credentials are used.
- 
-      .PARAMETER Password
-      User account password
+      .PARAMETER Credentials
+      Credentials used to connect to the database if different from account executing the current script.
  
       .PARAMETER Timeout
       The number of sections until connection times out.
@@ -33,22 +30,24 @@ function Open-SqlConnection {
       .EXAMPLE
       $database = Open-SqlConnection -Server 'SqlServer' -Database 'MyDatabase';
  
-        Open database connection.
+      .EXAMPLE
+      $credentials = Get-Credential -UserName 'website_user' -Message "Provide password for database"
+      $db = Open-SqlConnection -Server 'localhost' -Database 'example-website' -Credentials $credentials;
+
      #> 
     [CmdletBinding()] 
     param( 
         [Parameter(Mandatory = $true)] [string] $Server,
         [Parameter(Mandatory = $true)] [string] $Database,
-        [Parameter(Mandatory = $false)] [string] $Username = $null,
-        [Parameter(Mandatory = $false)] [SecureString] $Password = $null,
+        [Parameter(Mandatory = $false)] [System.Management.Automation.PSCredential] $Credentials = $null,
         [Parameter(Mandatory = $false)] [int] $Timeout = 15 
     );
  
-    $security = if ([string]::IsNullOrEmpty($Username) ) { 
+    $security = if ([string]::IsNullOrEmpty($PSCredential) ) { 
         'Integrated Security=True';
     }
     else {
-        'User ID={0};Password={1}' -f $Username, $Password;        
+        'User ID={0};Password={1}' -f $Credentials.GetNetworkCredential().UserName, $Credentials.GetNetworkCredential().Password;        
     } 
 
     $connectionString = 'Server={0};Database={1};Connect Timeout={2};{3}' -f $Server, $Database, $Timeout, $security;
