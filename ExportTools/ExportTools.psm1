@@ -28,7 +28,7 @@ function Export-Excel {
     )
 
     BEGIN {     
-        $header = $();
+        $header = @();
         $rowIndex = 1;
 
         $excel = New-Object -ComObject excel.application;
@@ -46,15 +46,17 @@ function Export-Excel {
                 $i = 0;
                 $object | Get-Member -MemberType NoteProperty | ForEach-Object {
                     $worksheet.cells.item(1, ++$i) = $_.Name;
-                    $header = $header, $_.Name;
+                    $header += $_.Name;
                 };
                 $rowIndex++;
             }
         
             ## Insert values into current row index.
-            $colIndex = 0;
+            $colIndex = 1;            
             foreach ($name in $header) {
-                $worksheet.cells.item($rowIndex, ++$colIndex) = $($object."$($name)");
+                $value = $object."$name";
+                $worksheet.cells.item($rowIndex, $colIndex) = $value;
+                $colIndex++;
             }
             $rowIndex++;
         }
@@ -76,4 +78,4 @@ function Export-Excel {
         Remove-Variable -Name excel
 
     }
-}        
+}
